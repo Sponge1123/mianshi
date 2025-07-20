@@ -52,17 +52,17 @@ const QuestionTable: React.FC = (props: Props) => {
         return <Link href={`/question/${record.id}`}>{record.title}</Link>;
       },
     },
-    {
-      title: "标签",
-      dataIndex: "tagList",
-      valueType: "select",
-      fieldProps: {
-        mode: "tags",
-      },
-      render: (_, record) => {
-        return <TagList tagList={record.tagList} />;
-      },
-    },
+    // {
+    //   title: "标签",
+    //   dataIndex: "tagList",
+    //   valueType: "select",
+    //   fieldProps: {
+    //     mode: "tags",
+    //   },
+    //   render: (_, record) => {
+    //     return <TagList tagList={record.tagList} />;
+    //   },
+    // },
   ];
 
   return (

@@ -44,8 +44,8 @@ public class FileController {
      * @param multipartFile
      * @param uploadFileRequest
      * @param request
-     * @return
-     */
+//     * @return
+//     */
     @PostMapping("/upload")
     public BaseResponse<String> uploadFile(@RequestPart("file") MultipartFile multipartFile,
             UploadFileRequest uploadFileRequest, HttpServletRequest request) {

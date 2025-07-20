@@ -26,25 +26,28 @@ import com.sponge.mianshi.model.dto.question.QuestionQueryRequest;
 import com.sponge.mianshi.model.dto.question.QuestionUpdateRequest;
 import com.sponge.mianshi.model.entity.Question;
 import com.sponge.mianshi.model.entity.User;
+import com.sponge.mianshi.model.vo.PictureTagCategory;
+import com.sponge.mianshi.model.vo.PracticeRecordVO;
 import com.sponge.mianshi.model.vo.QuestionBankVO;
 import com.sponge.mianshi.model.vo.QuestionVO;
 import com.sponge.mianshi.sentinel.SentinelConstant;
 import com.sponge.mianshi.service.QuestionBankQuestionService;
 import com.sponge.mianshi.service.QuestionService;
 import com.sponge.mianshi.service.UserService;
+import com.sponge.mianshi.service.PracticeRecordService; // 假设存在 PracticeRecordService
+import com.sponge.mianshi.model.entity.PracticeRecord; // 假设存在 PracticeRecord 实体类
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 题目接口
- *
-
  */
 @RestController
 @RequestMapping("/question")
@@ -61,6 +64,10 @@ public class QuestionController {
 
     @Resource
     private CounterManager counterManager;
+
+    @Resource
+    private PracticeRecordService practiceRecordService; // 注入 PracticeRecordService
+
     // region 增删改查
 
     /**
@@ -185,6 +192,16 @@ public class QuestionController {
         QuestionVO questionVO = questionService.getQuestionVO(question, request);
         //查询完数据库后判断，是热Key则设置本地缓存
         JdHotKeyStore.smartSet(key,questionVO);
+
+        // 记录刷题信息到数据库
+        if (loginUser != null) {
+            PracticeRecord practiceRecord = new PracticeRecord();
+            practiceRecord.setUserId(loginUser.getId());
+            practiceRecord.setQuestionId(id);
+            practiceRecord.setTimestamp(new Date());
+            practiceRecordService.save(practiceRecord);
+        }
+
         // 获取封装类并返回
         return ResultUtils.success(questionVO);
     }
@@ -370,6 +387,19 @@ public class QuestionController {
     }
 
     /**
+     * 获取所有标签
+     *
+     * @return
+     */
+    @GetMapping("/tags")
+    public BaseResponse<PictureTagCategory> getAllTags() {
+        PictureTagCategory pictureTagCategory = new PictureTagCategory();
+        List<String> tagList = Arrays.asList("JAVA", "CSS", "HTML", "数据库", "网络", "JavaScript", "操作系统", "设计模式", "Redis","前端框架","后端框架");
+        pictureTagCategory.setTagList(tagList);
+        return ResultUtils.success(pictureTagCategory);
+    }
+
+    /**
      * 通过ES聚合搜索题目
      * @param questionQueryRequest
      * @param request
@@ -388,5 +418,61 @@ public class QuestionController {
         //Page<Question> questionPage = questionService.listQuestionByPage(questionQueryRequest);
         return ResultUtils.success(questionService.getQuestionVOPage(questionPage, request));
     }
+
+    /**
+     * 获取我的刷题记录
+     *
+     * @param request
+     * @return
+     */
+    @GetMapping("/my/practice/records")
+    public BaseResponse<List<PracticeRecordVO>> getMyPracticeRecords(HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        long userId = loginUser.getId();
+
+        // 获取当前用户的刷题记录
+        List<PracticeRecord> practiceRecords = practiceRecordService.getPracticeRecordsByUserId(userId);
+
+        // 获取所有的 questionId
+        Set<Long> questionIds = practiceRecords.stream()
+                .map(PracticeRecord::getQuestionId)
+                .collect(Collectors.toSet());
+
+        // 根据 questionId 查询数据库中的 Question
+        List<Question> questions = questionService.listByIds(questionIds);
+
+        // 创建一个映射，用于将 Question 按照 questionId 存储
+        Map<Long, Question> questionMap = questions.stream()
+                .collect(Collectors.toMap(Question::getId, question -> question));
+
+        // 按时间降序排序，确保最新的记录在前
+        practiceRecords.sort((record1, record2) -> record2.getTimestamp().compareTo(record1.getTimestamp()));
+
+        // 使用一个 Map 来去重，只保留每个题目的最新记录
+        Map<Long, PracticeRecord> latestPracticeRecordMap = new LinkedHashMap<>();
+        for (PracticeRecord record : practiceRecords) {
+            // 如果该题目尚未加入 Map，则加入
+            latestPracticeRecordMap.putIfAbsent(record.getQuestionId(), record);
+        }
+
+        // 将 PracticeRecord 转换为 PracticeRecordVO，并设置对应的 Question
+        List<PracticeRecordVO> practiceRecordVOList = latestPracticeRecordMap.values().stream().map(practiceRecord -> {
+            PracticeRecordVO practiceRecordVO = new PracticeRecordVO();
+            // 使用 BeanUtils.copyProperties 来复制属性
+            BeanUtils.copyProperties(practiceRecord, practiceRecordVO);
+
+            // 获取对应的 Question 并设置到 PracticeRecordVO
+            Question question = questionMap.get(practiceRecord.getQuestionId());
+            practiceRecordVO.setQuestion(question);
+
+            return practiceRecordVO;
+        }).collect(Collectors.toList());
+
+        return ResultUtils.success(practiceRecordVOList);
+    }
+
+
+
+
     // endregion
 }

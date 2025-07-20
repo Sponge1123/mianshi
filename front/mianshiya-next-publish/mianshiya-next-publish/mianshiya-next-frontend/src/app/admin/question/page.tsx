@@ -136,18 +136,18 @@ const QuestionAdminPage: React.FC = () => {
         return <MdEditor {...fieldProps} />;
       },
     },
-    {
-      title: "标签",
-      dataIndex: "tags",
-      valueType: "select",
-      fieldProps: {
-        mode: "tags",
-      },
-      render: (_, record) => {
-        const tagList = JSON.parse(record.tags || "[]");
-        return <TagList tagList={tagList} />;
-      },
-    },
+    // {
+    //   title: "标签",
+    //   dataIndex: "tags",
+    //   valueType: "select",
+    //   fieldProps: {
+    //     mode: "tags",
+    //   },
+    //   render: (_, record) => {
+    //     const tagList = JSON.parse(record.tags || "[]");
+    //     return <TagList tagList={tagList} />;
+    //   },
+    // },
     {
       title: "创建用户",
       dataIndex: "userId",
